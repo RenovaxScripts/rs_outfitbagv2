@@ -77,7 +77,7 @@ end
 
 
 CreateThread(function()
-    if Config.InteractionTarget == 'target' then
+    if Config.InteractionType == 'target' then
         InteractionTarget()
     elseif Config.InteractionType == 'textui' then
         InteractionTextui() 

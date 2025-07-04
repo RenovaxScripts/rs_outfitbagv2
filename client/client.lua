@@ -151,7 +151,7 @@ AddEventHandler('rs_outfitbag:open', function()
             },
             {
                 title = Language.outfits,
-                description = Language.savenowoutfit,
+                description = Language.showsavedoutfits,
                 icon = 'shirt',
                 onSelect = function()
                     TriggerEvent('rs_outfitbag:showOutfitList')
@@ -210,93 +210,157 @@ end)
 
 RegisterNetEvent('rs_outfitbag:showOutfitList')
 AddEventHandler('rs_outfitbag:showOutfitList', function()
-    ESX.TriggerServerCallback("rs_outfitbag:getOutfits", function(outfits)
-        if not outfits or #outfits == 0 then
-                
-            if Config.Notify == 'esx' then
-                Notify(Language.nooutfits)
-            else
-                Notify(Language.title, Language.nooutfits, 'error')
+    if framework == "esx" then
+        ESX.TriggerServerCallback("rs_outfitbag:getOutfits", function(outfits)
+            if not outfits or #outfits == 0 then
+                if Config.Notify == 'esx' then
+                    Notify(Language.nooutfits)
+                else
+                    Notify(Language.title, Language.nooutfits, 'error')
+                end
+                return
             end
-            return
-        end
 
+            local elements = {}
 
-        local elements = {}
+            for _, outfit in pairs(outfits) do
+                table.insert(elements, {
+                    title = outfit.name,
+                    description = Language.moreoptions,
+                    icon = "shirt",
+                    menu = "outfit:" .. outfit.id
+                })
 
-        for _, outfit in pairs(outfits) do
+                local options = {
+                    {
+                        title = Language.dressup,
+                        icon = "tshirt",
+                        onSelect = function()
+                            local ped = PlayerPedId()
+                            local dict = "missmic4"
+                            local clip = "michael_tux_fidget"
 
-            table.insert(elements, {
-                title = outfit.name,
-                description = Language.moreoptions,
-                icon = "shirt",
-                menu = "outfit:" .. outfit.id
-            })
+                            RequestAnimDict(dict)
+                            while not HasAnimDictLoaded(dict) do
+                                Wait(10)
+                            end
 
-
-            local options = {
-                {
-                    title = Language.dressup,
-                    icon = "tshirt",
-                    onSelect = function()
-                                local ped = PlayerPedId()
-
-
-                                local dict = "missmic4"
-                                local clip = "michael_tux_fidget"
-
-                                RequestAnimDict(dict)
-                                while not HasAnimDictLoaded(dict) do
-                                    Wait(10)
-                                end
-
-
-                                TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
-
-                                
-                                Wait(3500)
-                        TriggerServerEvent("rs_outfitbag:wearOutfit", outfit.id)
-                    end
-                },
-                {
-                    title = Language.rename,
-                    icon = "pen",
-                    onSelect = function()
-                        local newName = lib.inputDialog(Language.renameoutfit, {
-                            { type = "input", label = Language.renameoutfitname, default = outfit.name }
-                        })
-                        if newName and newName[1] then
-                            TriggerServerEvent("rs_outfitbag:renameOutfit", outfit.id, newName[1])
+                            TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
+                            Wait(3500)
+                            TriggerServerEvent("rs_outfitbag:wearOutfit", outfit.id)
                         end
-                    end
-                },
-                {
-                    title = Language.delete,
-                    icon = "trash",
-                    onSelect = function()
-                        TriggerServerEvent("rs_outfitbag:deleteOutfit", outfit.id)
-                    end
+                    },
+                    {
+                        title = Language.rename,
+                        icon = "pen",
+                        onSelect = function()
+                            local newName = lib.inputDialog(Language.renameoutfit, {
+                                { type = "input", label = Language.renameoutfitname, default = outfit.name }
+                            })
+                            if newName and newName[1] then
+                                TriggerServerEvent("rs_outfitbag:renameOutfit", outfit.id, newName[1])
+                            end
+                        end
+                    },
+                    {
+                        title = Language.delete,
+                        icon = "trash",
+                        onSelect = function()
+                            TriggerServerEvent("rs_outfitbag:deleteOutfit", outfit.id)
+                        end
+                    }
                 }
-            }
 
+                lib.registerContext({
+                    id = "outfit:" .. outfit.id,
+                    title = outfit.name,
+                    options = options
+                })
+            end
 
             lib.registerContext({
-                id = "outfit:" .. outfit.id,
-                title = outfit.name,
-                options = options
+                id = "outfits_main",
+                title = Language.myoutfit,
+                options = elements
             })
-        end
 
+            lib.showContext("outfits_main")
+        end)
+    elseif framework == "qb" then
+        QBCore.Functions.TriggerCallback("rs_outfitbag:getOutfits", function(outfits)
+            if not outfits or #outfits == 0 then
+                Notify(Language.title, Language.nooutfits, 'error')
+                return
+            end
 
-        lib.registerContext({
-            id = "outfits_main",
-            title = Language.myoutfit,
-            options = elements
-        })
+            local elements = {}
 
+            for _, outfit in pairs(outfits) do
+                table.insert(elements, {
+                    title = outfit.name,
+                    description = Language.moreoptions,
+                    icon = "shirt",
+                    menu = "outfit:" .. outfit.id
+                })
 
-        lib.showContext("outfits_main")
-    end)
+                local options = {
+                    {
+                        title = Language.dressup,
+                        icon = "tshirt",
+                        onSelect = function()
+                            local ped = PlayerPedId()
+                            local dict = "missmic4"
+                            local clip = "michael_tux_fidget"
+
+                            RequestAnimDict(dict)
+                            while not HasAnimDictLoaded(dict) do
+                                Wait(10)
+                            end
+
+                            TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
+                            Wait(3500)
+                            TriggerServerEvent("rs_outfitbag:wearOutfit", outfit.id)
+                        end
+                    },
+                    {
+                        title = Language.rename,
+                        icon = "pen",
+                        onSelect = function()
+                            local newName = lib.inputDialog(Language.renameoutfit, {
+                                { type = "input", label = Language.renameoutfitname, default = outfit.name }
+                            })
+                            if newName and newName[1] then
+                                TriggerServerEvent("rs_outfitbag:renameOutfit", outfit.id, newName[1])
+                            end
+                        end
+                    },
+                    {
+                        title = Language.delete,
+                        icon = "trash",
+                        onSelect = function()
+                            TriggerServerEvent("rs_outfitbag:deleteOutfit", outfit.id)
+                        end
+                    }
+                }
+
+                lib.registerContext({
+                    id = "outfit:" .. outfit.id,
+                    title = outfit.name,
+                    options = options
+                })
+            end
+
+            lib.registerContext({
+                id = "outfits_main",
+                title = Language.myoutfit,
+                options = elements
+            })
+
+            lib.showContext("outfits_main")
+        end)
+    elseif framework == "custom" then
+        -- Add your custom framework logic here
+    end
 end)
 
 
@@ -426,6 +490,26 @@ AddEventHandler('rs_outfitbag:place',function ()
                 Notify(Language.title, Language.noitem, 'error')
             end
         return
+    elseif Config.Inventory == 'qb' then
+        local playerData = QBCore.Functions.GetPlayerData()
+        local count = 0
+
+        for _, item in pairs(playerData.items) do
+            if item.name == Config.Item.item then
+                count = item.amount
+                break
+            end
+        end
+
+        if count <= 0 then
+            DebugPrint('Player does not have the required item: ' .. Config.Item.item)
+            if Config.Notify == 'esx' then
+                Notify(Language.noitem)
+            else
+                Notify(Language.title, Language.noitem, 'error')
+            end
+            return
+        end
     elseif Config.Inventory == 'custom' then
                  -- Custom inventory logic here
      end
