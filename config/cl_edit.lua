@@ -1,3 +1,6 @@
+--------------------------
+--------- Notify ---------
+--------------------------
 
 function Notify(title, desc, type)
     while Config.Notify == 'auto' do Wait(100) end

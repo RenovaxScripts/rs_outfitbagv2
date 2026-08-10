@@ -1,10 +1,18 @@
+---------------------------------
+--------- Autodetection ---------
+---------------------------------
+
+-----------------------------
+--------- Framework ---------
+-----------------------------
+
 if Config.Framework == 'auto' then
     print("^3[WARNING]^0 Framework detection is set to 'auto'. Check if it is set correctly in config.lua.")
     CreateThread(function()
-        if GetResourceState('qb-core') == 'started' then
+        if GetResourceState('qbx_core') == 'started' or GetResourceState('qb-core') == 'started' then
             QBCore = exports['qb-core']:GetCoreObject()
             Config.Framework = 'qb'
-            print("^2[INFO]^0 Framework detection: QBcore")
+            print("^2[INFO]^0 Framework detection: QBcore/Qbox")
         elseif GetResourceState('es_extended') == 'started' then
             ESX = exports["es_extended"]:getSharedObject()
             Config.Framework = 'esx'
@@ -13,13 +21,17 @@ if Config.Framework == 'auto' then
     end)
 end
 
+--------------------------
+--------- Notify ---------
+--------------------------
+
 if Config.Notify == 'auto' then
     print("^3[WARNING]^0 Notification detection is set to 'auto'. Check if it is set correctly in config.lua.")
     CreateThread(function()
         if GetResourceState('ox_lib') == 'started' then
            Config.Notify = 'ox'
            print("^2[INFO]^0 Notification detection: ox_lib")
-        elseif GetResourceState('qb-core') == 'started' then
+        elseif GetResourceState('qbx_core') == 'started' or GetResourceState('qb-core') == 'started' then
             Config.Notify = 'qb'
             print("^2[INFO]^0 Notification detection: qb notify")
         elseif GetResourceState('es_extended') == 'started' then
@@ -31,6 +43,10 @@ if Config.Notify == 'auto' then
         end
     end)
 end
+
+--------------------------
+--------- Target ---------
+--------------------------
 
 if Config.InteractionType == 'target' then
 if Config.Target == 'auto' then
@@ -49,11 +65,13 @@ if Config.Target == 'auto' then
             Config.Target = 'custom'
             print("^3[WARNING]^0 Target system not detected. Custom mode is being used.")
         end
-        InteractionTarget()
     end)
 end
 end
 
+--------------------------
+--------- TextUI ---------
+--------------------------
 
 if Config.InteractionType == 'textui' then
 if Config.TextUI == 'auto' then
@@ -69,7 +87,6 @@ if Config.TextUI == 'auto' then
             Config.TextUI = 'custom'
             print("^3[WARNING]^0 Textui system not detected. Custom mode is used.")
         end
-        InteractionTextui()
     end)
 end
 
@@ -77,9 +94,11 @@ end
 
 
 CreateThread(function()
-    if Config.InteractionTarget == 'target' then
+    if Config.InteractionType == 'target' then
+        while Config.Target == 'auto' do Wait(100) end
         InteractionTarget()
     elseif Config.InteractionType == 'textui' then
+        while Config.TextUI == 'auto' do Wait(100) end
         InteractionTextui() 
     elseif Config.InteractionType == 'custom' then
         InteractionCustom()
@@ -88,6 +107,9 @@ CreateThread(function()
     end
 end)
 
+-----------------------------
+--------- Inventory ---------
+-----------------------------
 
 if Config.Inventory == 'auto' then
 CreateThread(function()
@@ -101,9 +123,12 @@ CreateThread(function()
         elseif GetResourceState('codem-inventory') == 'started' then
             Config.Inventory = 'codem'
             print("^2[INFO]^0 Inventory detection: codem-inventory")
+        elseif GetResourceState('qb-inventory') == 'started' then
+            Config.Inventory = 'qb'
+            print("^2[INFO]^0 Inventory detection: qb-inventory")
         else
             Config.Inventory = 'custom'
             print("^3[WARNING]^0 Inventory not detected. Custom mode is being used.")
         end
-end)
+    end)
 end

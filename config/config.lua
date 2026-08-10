@@ -2,16 +2,17 @@ Config = {}
 
 Config.Debug = true -- If true, you will get an additional F8 prints for what's going on
 
-Config.Framework = 'auto' -- esx = ESX, qb = QBCore, custom = Csutom Framework - change in cl_edit.lua
+Config.Framework = 'qb' -- esx = ESX, qb = QBCore, custom = Csutom Framework - change in cl_edit.lua
 -- or if you want you can set it to 'auto' and it will detect the framework automatically
 
-Config.Notify = 'auto' -- esx = ESX, qb = QBCore, ox = OxLib, custom = Custom Notify - change in cl_edit.lua
+Config.Notify = 'ox' -- esx = ESX, qb = QBCore, ox = OxLib, custom = Custom Notify - change in cl_edit.lua
 -- or if you want you can set it to 'auto' and it will detect the notify automatically
 
 
--- !!!! IDK if codem inventory working !!!! :D
-Config.Inventory = 'ox' -- ox = Ox inventory, qs = Qs inventory, codem = CodeM inventory, custom = Custom Inventory - change in sv_edit.lua
+Config.Inventory = 'ox' -- ox = Ox inventory, qs = Qs inventory, codem = CodeM inventory, qb = QB Inventory, custom = Custom Inventory - change in sv_edit.lua
 -- or you can set it to 'auto' and it will detect the inventory automatically
+
+Config.Menu = 'ox' -- ox = Ox lib menu, qb = qb menu, custom = Custom Menu - change in cl_edit.lua
 
 Config.InteractionType = 'target' -- textui = Ox Lib Text ui - you can change in cl_edit.lua, target = Target system qb-target/qtarget/ox_target,
 -- custom = Custom Interaction - change in cl_edit.lua

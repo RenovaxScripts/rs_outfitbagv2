@@ -1,14 +1,10 @@
-
-
 fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-
 author 'Renovax Scripts | Golden Meow'
 description '[FREE] Outfit bag V2'
-version '2.0.0'
-
+version '2.0.4'
 
 shared_scripts {
 	'@ox_lib/init.lua',
@@ -28,10 +24,5 @@ server_script {
 	'config/sv_edit.lua',
 }
 
-
-dependencies {
-	'ox_lib',
-	'ox_target'
- }
 
 export 'place'

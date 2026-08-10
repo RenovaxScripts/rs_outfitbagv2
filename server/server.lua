@@ -10,7 +10,7 @@ CreateThread(function()
 
         if GetResourceState("es_extended") == "started" then
             Config.Framework = "esx"
-        elseif GetResourceState("qb-core") == "started" then
+        elseif GetResourceState("qbx_core") == "started" or GetResourceState("qb-core") == "started" then
             Config.Framework = "qb"
         end
     end
@@ -113,12 +113,23 @@ end
 
 RegisterServerEvent('rs_outfitbag:placedBag') 
 AddEventHandler('rs_outfitbag:placedBag', function()
+    local src = source
+    while Config.Inventory == 'auto' do
+        ServerDebugPrint('Waiting for inventory auto-detection...')
+        Wait(100)
+    end
+
     if Config.Inventory == 'ox' then
-        exports.ox_inventory:RemoveItem(source, Config.Item.item, 1, nil, nil, nil)
+        exports.ox_inventory:RemoveItem(src, Config.Item.item, 1, nil, nil, nil)
     elseif Config.Inventory == 'qs' then
-        exports['qs-inventory']:RemoveItem(source, Config.Item.item, 1)
+        exports['qs-inventory']:RemoveItem(src, Config.Item.item, 1)
     elseif Config.Inventory == 'codem' then
-        exports['codem-inventory']:RemoveItem(source, Config.Item.item, 1)
+        exports['codem-inventory']:RemoveItem(src, Config.Item.item, 1)
+    elseif Config.Inventory == 'qb' then
+        local Player = QBCore.Functions.GetPlayer(src)
+        if Player then
+            Player.Functions.RemoveItem(Config.Item.item, 1)
+        end
     elseif Config.Inventory == 'custom' then
         -- Add your custom removal logic
         ServerDebugPrint("^3[WARNING]^0 RemoveItem called, but custom inventory is not defined.")
@@ -129,12 +140,23 @@ end)
 
 RegisterServerEvent('rs_outfitbag:pickedupBag')
 AddEventHandler('rs_outfitbag:pickedupBag', function()
+    local src = source
+    while Config.Inventory == 'auto' do
+        ServerDebugPrint('Waiting for inventory auto-detection...')
+        Wait(100)
+    end
+
     if Config.Inventory == 'ox' then
-        exports.ox_inventory:AddItem(source, Config.Item.item, 1, nil, nil, nil)
+        exports.ox_inventory:AddItem(src, Config.Item.item, 1, nil, nil, nil)
     elseif Config.Inventory == 'qs' then
-        exports['qs-inventory']:AddItem(source, Config.Item.item, 1)
+        exports['qs-inventory']:AddItem(src, Config.Item.item, 1)
     elseif Config.Inventory == 'codem' then
-        exports['codem-inventory']:AddItem(source, Config.Item.item, 1)
+        exports['codem-inventory']:AddItem(src, Config.Item.item, 1)
+    elseif Config.Inventory == 'qb' then
+        local Player = QBCore.Functions.GetPlayer(src)
+        if Player then
+            Player.Functions.AddItem(Config.Item.item, 1)
+        end
     elseif Config.Inventory == 'custom' then
         -- Add your custom add logic
         ServerDebugPrint("^3[WARNING]^0 AddItem called but custom inventory is not defined.")
@@ -163,16 +185,30 @@ RegisterNetEvent("rs_outfitbag:saveOutfit", function(label, outfit)
 end)
 
 RegisterNetEvent("rs_outfitbag:deleteOutfit", function(id)
-    exports.oxmysql:execute('DELETE FROM user_outfits WHERE id = ?', {id})
+    local src = source
+    local player = GetPlayer(src)
+    if not player then return end
+    local identifier = GetIdentifier(player)
+
+    exports.oxmysql:execute('DELETE FROM user_outfits WHERE id = ? AND identifier = ?', {id, identifier})
 end)
 
 RegisterNetEvent("rs_outfitbag:renameOutfit", function(id, newName)
-    exports.oxmysql:execute('UPDATE user_outfits SET name = ? WHERE id = ?', {newName, id})
+    local src = source
+    local player = GetPlayer(src)
+    if not player then return end
+    local identifier = GetIdentifier(player)
+
+    exports.oxmysql:execute('UPDATE user_outfits SET name = ? WHERE id = ? AND identifier = ?', {newName, id, identifier})
 end)
 
 RegisterNetEvent("rs_outfitbag:wearOutfit", function(id)
     local src = source
-    exports.oxmysql:execute('SELECT skin FROM user_outfits WHERE id = ?', {id}, function(result)
+    local player = GetPlayer(src)
+    if not player then return end
+    local identifier = GetIdentifier(player)
+
+    exports.oxmysql:execute('SELECT skin FROM user_outfits WHERE id = ? AND identifier = ?', {id, identifier}, function(result)
         if result[1] then
             local skin = json.decode(result[1].skin)
             TriggerClientEvent("rs_outfitbag:applyOutfit", src, skin)
