@@ -133,7 +133,7 @@ end
 
 ---
 
-## Recommended FiveM Hosting — RocketNode
+## Recommended FiveM Hosting - RocketNode
 
 Looking for reliable hosting for your FiveM server?
 
