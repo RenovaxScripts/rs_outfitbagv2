@@ -133,6 +133,22 @@ end
 
 ---
 
+Recommended FiveM Hosting — RocketNode
+
+Looking for reliable hosting for your FiveM server?
+
+I personally recommend RocketNode for hosting FiveM servers running my or other scripts and resources.
+
+Get 25% OFF your FiveM server using my discount code:
+
+Code: RENOVAX
+
+Get your server here:
+https://rocketnode.us/RENOVAX
+
+The 25% discount code is valid for FiveM server hosting only.
+
+
 ## Credits
 Developed for FiveM by **Renovax Scripts**.
 
