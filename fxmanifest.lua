@@ -2,27 +2,42 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-author 'Renovax Scripts | Golden Meow'
-description '[FREE] Outfit bag V2'
-version '2.0.4'
+author 'Renovax Scripts | GoldernMeow'
+description '[FREE] Multijob system'
+version '1.0.0'
+
+ui_page 'html/index.html'
 
 shared_scripts {
-	'@ox_lib/init.lua',
-	'config/config.lua',
-	'config/language.lua',
+    'config.lua',
+    'locales/en.lua',
+    'locales/cz.lua',
+    'shared/locale.lua'
 }
 
 client_scripts {
-	'config/autodetection/cl_autodetection.lua',
-	'client/*.lua',
-	'config/cl_edit.lua',
+    'client/main.lua'
 }
 
-server_script {
-	'server/*.lua',
-	'config/autodetection/sv_autodetection.lua',
-	'config/sv_edit.lua',
+server_scripts {
+    'server_config.lua',
+    'server/database.lua',
+    'server/framework.lua',
+    'server/main.lua'
 }
 
+files {
+    'html/index.html',
+    'html/style.css',
+    'html/script.js'
+}
 
-export 'place'
+escrow_ignore {
+    'config.lua',
+    'server_config.lua',
+    'locales/*.lua',
+    'shared/locale.lua',
+    'html/index.html',
+    'html/style.css',
+    'html/script.js'
+}

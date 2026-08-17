@@ -1,155 +1,138 @@
-# README for `rs_outfitbagv2` Script
+# Renovax Scripts | Multijob
 
-## Overview
+Multijob management system for Qbox, ESX Legacy & QBCore allowing players to switch between saved jobs, toggle duty status, view salaries, and search positions via NUI interface.
 
-The `rs_outfitbagv2` script adds functionality to interact with "outfit bags" in a FiveM server, allowing players to place, pick up, and open them for outfit management. This script is highly customizable and integrates with different notification systems and appearance systems.
+## — FEATURES LIST —
 
----
+### Core Features
+  - **Multijob Management & Real-Time Switching**
+    Allows players to save and switch between multiple jobs seamlessly without server latency with automatic slot tracking and live search bar.
+  - **Advanced Duty System**
+    Full support for On-Duty / Off-Duty toggling for Qbox & QBCore (`SetJobDuty` native) as well as ESX Legacy (`off_` job prefix system) with smart job normalization.
+  - **In-Game Admin Management**
+    Use `/addmultijob`, `/removemultijob`, and `/listmultijobs` commands with Ace, Qbox group, ESX group, and QBCore permission integration.
 
-## Features
-- **Place Outfit Bags**: Players can place outfit bags into the game world.
-- **Pick Up Bags**: Retrieve previously placed outfit bags.
-- **Open Bags**: Access outfit management directly from the bag.
-- **Progress Animation**: Smooth progress circle and animations for interactions.
-- **Debugging**: Enable detailed debug outputs for monitoring script behavior.
-- **Customization**: Support for different notification and appearance systems.
+### Customization & Compatibility
+  - **Framework & Database Compatibility**
+    Supports Qbox, ESX Legacy and QBCore out of the box with native `oxmysql` and `mysql-async` auto-table creation.
+  - **Notification Systems**
+    Built-in integration for `ox_lib`, `qbx`, `esx`, `qb`, and custom notifications.
+  - **Multi-Language Localization**
+    Includes Czech (`cz`) and English (`en`) locales out of the box with simple key-based translations.
 
----
+### Additional Features
+  - **Secure Server Config**
+    Sensitive data like Webhook URLs and Admin Groups are placed in `server_config.lua` to prevent client-side data leaks.
 
-## Installation
 
-1. **Download and Add the Script**  
-   Place the `rs_outfitbagv2` folder in your FiveM server's `resources` directory.
+## — GET IT FOR FREE —
+Download now on GitHub:
+[rs_multijob](https://github.com/RenovaxScripts/rs_multijob)
 
-2. **Configure `server.cfg`**  
-   Add the following line to your `server.cfg` to ensure the resource starts:
-   ```bash
-   ensure rs_outfitbagv2
-   ```
+More updates coming soon!
 
-3. **Dependencies**  
-   - **ox_target**: Used for interaction targets.
-   - **ox_inventory**: Required for item checks.
-   - **lib.progressCircle**: For progress animations.
-   - **illenium-appearance** (Optional): For the outfit menu.
+## — CONFIGURATION —
 
----
+Hlavní konfigurace skriptu umožňuje nastavit framework, klávesové zkratky, limity jobů, ikony, oprávnění a upozornění. Všechny možnosti najdeš v souboru `config.lua`:
 
-## Configuration
-
-### Debugging
-Set `Config.Debug = true` to enable detailed logs for troubleshooting.
-
-### Appearance System
-- `Config.Appearance = 'illenium'`: Use Illenium Appearance system.
-- Change to `'custom'` or `'fivem'` to use a different system or customize.
-
-### Notification System
-- `Config.Notify = 'ox'`: Use `ox_notify` for alerts.
-- Set to `'rsscripts'` or `'custom'` for other notification systems.
-
-### Command
-- Command to place bags: `/outfitbag`  
-- Enable or disable the command in `Config.Command`.
-
-### Interaction Range
-Set `Config.Distance` to control how close players need to be to interact with the bag.
-
-### Bag Item
-The item required to place bags can be configured:
 ```lua
-Config.Item = {
-    enabled = true,
-    item = 'outfitbag' -- Name of the item
+Config = {}
+
+Config.Framework = 'auto' -- 'auto', 'qbox', 'esx', 'qbcore'
+Config.AutoFrameworkPriority = { 'qbox', 'esx', 'qbcore' }
+Config.Locale = 'en'
+
+Config.Command = 'multijob'
+Config.Keybind = 'F6'
+Config.MaxJobs = 5
+Config.DefaultJob = 'unemployed'
+Config.DefaultGrade = 0
+Config.SwitchCooldown = 10
+
+Config.ShowSalary = true
+Config.SalaryFormat = '$%s'
+
+Config.EnableDuty = true
+Config.OffDutyPrefix = 'off_'
+
+Config.JobIcons = {
+    ['police']     = 'fa-solid fa-shield-halved',
+    ['sheriff']    = 'fa-solid fa-star',
+    ['ambulance']  = 'fa-solid fa-user-nurse',
+    ['mechanic']   = 'fa-solid fa-wrench',
+    ['taxi']       = 'fa-solid fa-taxi',
+    ['cardealer']  = 'fa-solid fa-car',
+    ['realestate'] = 'fa-solid fa-house',
+    ['unemployed'] = 'fa-solid fa-user-slash',
+    ['reporter']   = 'fa-solid fa-newspaper',
+    ['garbage']    = 'fa-solid fa-trash-can',
+    ['lawyer']     = 'fa-solid fa-scale-balanced',
+    ['mafia']      = 'fa-solid fa-user-ninja'
+}
+
+Config.WhitelistJobs = {}
+Config.BlacklistJobs = {}
+Config.AutoSaveJobs = true
+Config.AutoSaveInterval = 30
+Config.AllowPlayerRemove = true
+
+Config.Notification = 'ox_lib' -- 'ox_lib', 'qbx', 'esx', 'qb', 'custom'
+Config.NotificationDuration = 5000
+Config.CustomNotify = function(message, notifyType)
+    print(('[rs_multijob] [%s] %s'):format(notifyType or 'info', message))
+end
+
+Config.Database = 'oxmysql'
+Config.DatabaseTable = 'rs_multijob_jobs'
+Config.AutoCreateTable = true
+
+Config.Admin = {
+    Enabled = true,
+    Commands = {
+        Add = 'addmultijob',
+        Remove = 'removemultijob',
+        List = 'listmultijobs'
+    },
+    Permission = {
+        UseAce = true,
+        Ace = 'rs_multijob.admin',
+        UseQboxGroups = true,
+        QboxGroups = { 'admin', 'god' },
+        UseESXGroups = true,
+        ESXGroups = {
+            admin = true,
+            superadmin = true
+        },
+        UseQBCorePermissions = true,
+        QBCorePermissions = { 'admin', 'god' }
+    }
 }
 ```
 
-### Bag Prop
-The 3D model used for the outfit bag:
-```lua
-Config.Prop = 'bkr_prop_duffel_bag_01a'
-```
-
----
-
-## Usage
-
-### Place a Bag
-1. Ensure the player has the required item (`outfitbag` by default).
-2. Use the `/outfitbag` command or trigger the `rs_outfitbagv2:place` event.
-
-### Open a Bag
-Approach the placed bag and interact with it using the target system (`ox_target`).
-
-### Pick Up a Bag
-Approach the placed bag and interact with it to pick it up.
-
----
-
-## Events
-
-### Client Events
-- `rs_outfitbagv2:open`: Opens the outfit bag interface.
-- `rs_outfitbagv2:placed`: Triggered when a bag is placed.
-- `rs_outfitbagv2:pickedup`: Triggered when a bag is picked up.
-
-### Server Events
-- `rs_outfitbagv2:placedBag`: Handles server-side logic when a bag is placed.
-- `rs_outfitbagv2:pickedupBag`: Handles server-side logic when a bag is picked up.
-
----
-
-## Debugging
-
-Set `Config.Debug = true` to enable console prints. Look for messages prefixed with `[RS Outfit Bag | DEBUG]` to track actions and troubleshoot issues.
-
----
-
-## Customization
-
-### Notifications
-Customize notifications in the `notify` function:
-```lua
-function notify(title, desc)
-    -- Add your own notification logic here
-end
-```
-
-### Appearance System
-Support for custom appearance systems can be added in the `openAppearance` function:
-```lua
-function openAppearance()
-    if Config.Appearance == 'custom' then
-        -- Add your custom appearance logic here
-    end
-end
-```
-
----
-
-## Known Issues
-- Ensure dependencies are correctly installed and configured.
-- Interaction range (`Config.Distance`) might need tuning for your use case.
-
----
-
-## Recommended FiveM Hosting - RocketNode
+## Recommended FiveM Hosting — RocketNode
 
 Looking for reliable hosting for your FiveM server?
 
-I personally recommend RocketNode for hosting FiveM servers running my or other scripts and resources.
+We personally recommend **RocketNode** as our preferred hosting provider for running our scripts and resources.
 
-Get 25% OFF your FiveM server using my discount code:
+RocketNode provides FiveM server hosting suitable for communities looking for a reliable and high-performance environment to run their server and our resources.
 
-Code: RENOVAX
+### Get 25% OFF
 
-Get your server here:
+**Use our affiliate link:**
+
 https://rocketnode.us/RENOVAX
 
-The 25% discount code is valid for FiveM server hosting only.
+and apply the following discount code at checkout:
 
+**`RENOVAX`**
 
-## Credits
-Developed for FiveM by **Renovax Scripts**.
+to receive **25% OFF** your RocketNode hosting.
 
+> **RocketNode is our recommended hosting provider for using our scripts and resources.**
 
+— LINKS —
+[TEBEX](https://renovax-scripts.xyz/)
+[YOUTUBE](https://youtu.be/IA_mrl0Ywvc)
+[DOCS](https://renovax-scripts.gitbook.io/renovax-scripts-docs)
+[DISCORD](https://discord.gg/SHjXNe4k7h)
