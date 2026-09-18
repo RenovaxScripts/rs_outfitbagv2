@@ -114,7 +114,10 @@ end)
 if Config.Inventory == 'auto' then
 CreateThread(function()
         print("^3[WARNING]^0 Inventory is set to 'auto'. Detecting...")
-        if GetResourceState('ox_inventory') == 'started' then
+        if GetResourceState('nord_inventory') == 'started' then
+            Config.Inventory = 'nord'
+            print("^2[INFO]^0 Inventory detection: nord_inventory")
+        elseif GetResourceState('ox_inventory') == 'started' then
             Config.Inventory = 'ox'
             print("^2[INFO]^0 Inventory detection: ox_inventory")
         elseif GetResourceState('qs-inventory') == 'started' then
