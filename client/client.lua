@@ -1,610 +1,666 @@
-local ESX, QBCore
-local outfitbags = {}
-local framework = nil
+local detectors = {}
+local zones = {}
+local detectorProps = {}
+local scannerProp
+local scannerBusy = false
 
-function DebugPrint(text)
-    if Config.Debug then print("[RS Outfit Bag | DEBUG] "..text) end
+local function T(key, ...)
+    local dictionary = Locales[Config.Locale] or Locales.en or {}
+    local value = dictionary[key] or key
+    if select('#', ...) > 0 then
+        return value:format(...)
+    end
+    return value
 end
 
-CreateThread(function()
-    while Config.Framework == 'auto' do
-        Wait(100)
+local function notify(key, notifyType, ...)
+    lib.notify({
+        title = T('creator_title'),
+        description = T(key, ...),
+        type = notifyType or 'inform'
+    })
+end
+
+local function loadModel(model)
+    local hash = type(model) == 'number' and model or joaat(model)
+    if Config.Debug then
+        print(("[DEBUG] Requesting model: %s (hash: %s)"):format(model, hash))
     end
-
-    if Config.Framework == "esx" then
-        while ESX == nil do
-            ESX = exports["es_extended"]:getSharedObject()
-            Wait(100)
+    if not IsModelInCdimage(hash) then
+        if Config.Debug then
+            print(("[DEBUG] Model '%s' (hash: %s) is NOT in Cdimage. Check if it is streamed or spelled correctly."):format(model, hash))
         end
-        framework = 'esx'
-        DebugPrint("[Outfit Bag] ESX loaded")
-    elseif Config.Framework == "qb" then
-        while QBCore == nil do
-            QBCore = exports['qb-core']:GetCoreObject()
-            Wait(100)
-        end
-        framework = 'qb'
-        DebugPrint("[Outfit Bag] QBCore loaded")
-    elseif Config.Framework == "custom" then
-        framework = 'custom'
-    else
-        DebugPrint("[Outfit Bag] Invalid framework configuration")
+        return nil
     end
-end)
-
-RegisterNetEvent('rs_outfitbag:open')
-AddEventHandler('rs_outfitbag:open', function()
-    if Config.Menu == 'ox' or Config.Menu == 'ox_lib' then
-        lib.registerContext({
-            id = 'outfitbag_main_menu',
-            title = Language.title,
-            options = {
-                {
-                    title = Language.saveoutfit,
-                    description = Language.savenowoutfit,
-                    icon = 'floppy-disk',
-                    onSelect = function()
-                        if framework == "esx" then
-                            ESX.TriggerServerCallback("rs_outfitbag:getOutfitCount", function(count)
-                                if count >= Config.MaxOutfits then
-                                    if Config.Notify == 'esx' then Notify(Language.maxoutfits) else Notify(Language.title, Language.maxoutfits, 'error') end
-                                    return
-                                end
-                                local input = lib.inputDialog(Language.saveoutfit, {
-                                    { type = "input", label = Language.nameoutfit, placeholder = Language.myoutfit }
-                                })
-                                if input and input[1] then
-                                    local ped = PlayerPedId()
-                                    local outfit = { model = GetEntityModel(ped), drawableVariations = {}, propVariations = {} }
-                                    for i = 0, 11 do table.insert(outfit.drawableVariations, { component = i, drawable = GetPedDrawableVariation(ped, i), texture = GetPedTextureVariation(ped, i), palette = GetPedPaletteVariation(ped, i) }) end
-                                    for i = 0, 7 do table.insert(outfit.propVariations, { component = i, drawable = GetPedPropIndex(ped, i), texture = GetPedPropTextureIndex(ped, i) }) end
-                                    TriggerServerEvent("rs_outfitbag:saveOutfit", input[1], outfit)
-                                    if Config.Notify == 'esx' then Notify(Language.savedoutfit .. '\n' .. input[1]) else Notify(Language.title, Language.savedoutfit .. '\n' .. input[1], 'success') end
-                                end
-                            end)
-                        elseif framework == "qb" then
-                            QBCore.Functions.TriggerCallback("rs_outfitbag:getOutfitCount", function(count)
-                                if count >= Config.MaxOutfits then
-                                    Notify(Language.title, Language.maxoutfits, 'error')
-                                    return
-                                end
-                                local input = lib.inputDialog(Language.saveoutfit, {
-                                    { type = "input", label = Language.nameoutfit, placeholder = Language.myoutfit }
-                                })
-                                if input and input[1] then
-                                    local ped = PlayerPedId()
-                                    local outfit = { model = GetEntityModel(ped), drawableVariations = {}, propVariations = {} }
-                                    for i = 0, 11 do table.insert(outfit.drawableVariations, { component = i, drawable = GetPedDrawableVariation(ped, i), texture = GetPedTextureVariation(ped, i), palette = GetPedPaletteVariation(ped, i) }) end
-                                    for i = 0, 7 do table.insert(outfit.propVariations, { component = i, drawable = GetPedPropIndex(ped, i), texture = GetPedPropTextureIndex(ped, i) }) end
-                                    TriggerServerEvent("rs_outfitbag:saveOutfit", input[1], outfit)
-                                    Notify(Language.title, Language.savedoutfit .. '\n' .. input[1], 'success')
-                                end
-                            end)
-                        end
-                    end 
-                },
-                {
-                    title = Language.outfits,
-                    description = Language.savenowoutfit,
-                    icon = 'shirt',
-                    onSelect = function()
-                        TriggerEvent('rs_outfitbag:showOutfitList')
-                    end
-                },
-            }
-        })
-        lib.showContext('outfitbag_main_menu')
-
-    elseif Config.Menu == 'qb' or framework == "qb" then
-        local Menu = {
-            {
-                header = Language.title,
-                isMenuHeader = true
-            },
-            {
-                header = Language.saveoutfit,
-                txt = Language.savenowoutfit,
-                icon = "fas fa-floppy-disk",
-                params = {
-                    event = "rs_outfitbag:qb:saveOutfitMenu"
-                }
-            },
-            {
-                header = Language.outfits,
-                txt = Language.savenowoutfit,
-                icon = "fas fa-shirt",
-                params = {
-                    event = "rs_outfitbag:showOutfitList"
-                }
-            },
-            {
-                header = Language.close or "Zavřít",
-                icon = "fas fa-xmark",
-                params = {
-                    event = "qb-menu:client:closeMenu"
-                }
-            }
-        }
-        exports['qb-menu']:openMenu(Menu)
-    end
-end)
-
-RegisterNetEvent('rs_outfitbag:qb:saveOutfitMenu', function()
-    QBCore.Functions.TriggerCallback("rs_outfitbag:getOutfitCount", function(count)
-        if count >= Config.MaxOutfits then
-            Notify(Language.title, Language.maxoutfits, 'error')
-            return
+    if not IsModelValid(hash) then
+        if Config.Debug then
+            print(("[DEBUG] Model '%s' (hash: %s) is NOT a valid model. Check if it is streamed or spelled correctly."):format(model, hash))
         end
-
-        local dialog = exports['qb-input']:ShowInput({
-            header = Language.saveoutfit,
-            submitText = Language.save,
-            inputs = {
-                {
-                    type = 'text',
-                    isRequired = true,
-                    name = 'outfitName',
-                    text = Language.nameoutfit or "Název outfitu"
-                }
-            }
-        })
-
-        if dialog and dialog.outfitName then
-            local ped = PlayerPedId()
-            local outfit = {
-                model = GetEntityModel(ped),
-                drawableVariations = {},
-                propVariations = {}
-            }
-
-            for i = 0, 11 do
-                table.insert(outfit.drawableVariations, {
-                    component = i,
-                    drawable = GetPedDrawableVariation(ped, i),
-                    texture = GetPedTextureVariation(ped, i),
-                    palette = GetPedPaletteVariation(ped, i)
-                })
+        return nil
+    end
+    RequestModel(hash)
+    local timeout = GetGameTimer() + 5000
+    while not HasModelLoaded(hash) do
+        if GetGameTimer() > timeout then
+            if Config.Debug then
+                print(("[DEBUG] Model '%s' (hash: %s) timed out loading after 5 seconds."):format(model, hash))
             end
+            return nil
+        end
+        Wait(0)
+    end
+    if Config.Debug then
+        print(("[DEBUG] Model '%s' (hash: %s) loaded successfully."):format(model, hash))
+    end
+    return hash
+end
 
-            for i = 0, 7 do
-                table.insert(outfit.propVariations, {
-                    component = i,
-                    drawable = GetPedPropIndex(ped, i),
-                    texture = GetPedPropTextureIndex(ped, i)
-                })
+local function loadAnimDict(dict)
+    if Config.Debug then
+        print(("[DEBUG] Requesting animation dictionary: %s"):format(dict))
+    end
+    RequestAnimDict(dict)
+    local timeout = GetGameTimer() + 5000
+    while not HasAnimDictLoaded(dict) do
+        if GetGameTimer() > timeout then
+            if Config.Debug then
+                print(("[DEBUG] Animation dictionary '%s' timed out loading after 5 seconds."):format(dict))
             end
-
-            TriggerServerEvent("rs_outfitbag:saveOutfit", dialog.outfitName, outfit)
-            Notify(Language.title, Language.savedoutfit .. " " .. dialog.outfitName, 'success')
+            return false
         end
-    end)
-end)
-
-RegisterNetEvent('rs_outfitbag:applyOutfit')
-AddEventHandler('rs_outfitbag:applyOutfit', function(outfit)
-    local ped = PlayerPedId()
-
-    local model = outfit.model
-    if model and IsModelValid(model) and not IsPedModel(ped, model) then
-        local modelHash = tonumber(model)
-        if not modelHash then
-            modelHash = GetHashKey(model)
-        end
-        RequestModel(modelHash)
-        while not HasModelLoaded(modelHash) do Citizen.Wait(10) end
-        SetPlayerModel(PlayerId(), modelHash)
-        SetModelAsNoLongerNeeded(modelHash)
-        ped = PlayerPedId()
+        Wait(0)
     end
-
-    if outfit.drawableVariations then
-        for _, comp in pairs(outfit.drawableVariations) do
-            SetPedComponentVariation(ped, comp.component, comp.drawable, comp.texture, comp.palette or 0)
-        end
+    if Config.Debug then
+        print(("[DEBUG] Animation dictionary '%s' loaded successfully."):format(dict))
     end
+    return true
+end
 
-    if outfit.propVariations then
-        for _, prop in pairs(outfit.propVariations) do
-            SetPedPropIndex(ped, prop.component, prop.drawable, prop.texture, true)
-        end
+local function deleteEntitySafe(entity)
+    if entity and DoesEntityExist(entity) then
+        SetEntityAsMissionEntity(entity, true, true)
+        DeleteEntity(entity)
     end
-    
-    if Config.Notify == 'esx' then
-        Notify(Language.outfiton)
-    else
-        Notify(Language.title, Language.outfiton, 'success')
-    end
-end)
+end
 
-RegisterNetEvent('rs_outfitbag:showOutfitList')
-AddEventHandler('rs_outfitbag:showOutfitList', function()
-    if Config.Menu == 'ox' or Config.Menu == 'ox_lib' then
-        local function openOxMenu(outfits)
-            if not outfits or #outfits == 0 then
-                if Config.Notify == 'esx' then Notify(Language.nooutfits) else Notify(Language.title, Language.nooutfits, 'error') end
+local function removeDetector(id)
+    if zones[id] then
+        zones[id]:remove()
+        zones[id] = nil
+    end
+    deleteEntitySafe(detectorProps[id])
+    detectorProps[id] = nil
+end
+
+local function createDetector(detector)
+    local id = tonumber(detector.id)
+    if not id or not detector.active then return end
+
+    local coords = vec3(detector.coords.x + 0.0, detector.coords.y + 0.0, detector.coords.z + 0.0)
+
+    if detector.type == 'model' and detector.spawn_model then
+        CreateThread(function()
+            local model = loadModel(Config.WalkthroughDetectorModel)
+            if not model or not detectors[id] or not detectors[id].active then
+                if Config.Debug then notify('model_failed', 'error') end
                 return
             end
 
-            local elements = {}
-            for _, outfit in pairs(outfits) do
-                table.insert(elements, {
-                    title = outfit.name,
-                    description = Language.moreoptions,
-                    icon = "shirt",
-                    menu = "outfit:" .. outfit.id
-                })
-
-                local options = {
-                    {
-                        title = Language.dressup,
-                        icon = "tshirt",
-                        onSelect = function()
-                            local ped = PlayerPedId()
-                            local dict = "missmic4"
-                            local clip = "michael_tux_fidget"
-                            RequestAnimDict(dict)
-                            while not HasAnimDictLoaded(dict) do Wait(10) end
-                            TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
-                            Wait(3500)
-                            TriggerServerEvent("rs_outfitbag:wearOutfit", outfit.id)
-                        end
-                    },
-                    {
-                        title = Language.rename,
-                        icon = "pen",
-                        onSelect = function()
-                            local newName = lib.inputDialog(Language.renameoutfit, {
-                                { type = "input", label = Language.renameoutfitname, default = outfit.name }
-                            })
-                            if newName and newName[1] then
-                                TriggerServerEvent("rs_outfitbag:renameOutfit", outfit.id, newName[1])
-                            end
-                        end
-                    },
-                    {
-                        title = Language.delete,
-                        icon = "trash",
-                        onSelect = function()
-                            TriggerServerEvent("rs_outfitbag:deleteOutfit", outfit.id)
-                        end
-                    }
-                }
-
-                lib.registerContext({
-                    id = "outfit:" .. outfit.id,
-                    title = outfit.name,
-                    options = options
-                })
-            end
-
-            lib.registerContext({
-                id = "outfits_main",
-                title = Language.myoutfit,
-                options = elements
-            })
-            lib.showContext("outfits_main")
-        end
-
-        if framework == "esx" then
-            ESX.TriggerServerCallback("rs_outfitbag:getOutfits", openOxMenu)
-        elseif framework == "qb" then
-            QBCore.Functions.TriggerCallback("rs_outfitbag:getOutfits", openOxMenu)
-        end
-
-    elseif Config.Menu == 'qb' or framework == "qb" then
-        QBCore.Functions.TriggerCallback("rs_outfitbag:getOutfits", function(outfits)
-            if not outfits or #outfits == 0 then
-                Notify(Language.title, Language.nooutfits, 'error')
-                return
-            end
-
-            local Menu = {}
-            Menu[#Menu+1] = {
-                header = Language.myoutfit,
-                isMenuHeader = true
-            }
-
-            for _, outfit in pairs(outfits) do
-                Menu[#Menu+1] = {
-                    header = outfit.name,
-                    txt = Language.moreoptions,
-                    params = {
-                        event = "rs_outfitbag:qb:openOutfitOptions",
-                        args = { outfit = outfit }
-                    }
-                }
-            end
-
-            Menu[#Menu+1] = {
-                header = "⬅ " .. (Language.back or "Zpět"),
-                params = {
-                    event = "rs_outfitbag:open"
-                }
-            }
-
-            exports['qb-menu']:openMenu(Menu)
+            local object = CreateObjectNoOffset(
+                model,
+                coords.x,
+                coords.y,
+                coords.z + Config.DetectorPropZOffset,
+                false,
+                false,
+                false
+            )
+            SetEntityHeading(object, detector.heading + 0.0)
+            FreezeEntityPosition(object, true)
+            SetEntityInvincible(object, true)
+            SetEntityCollision(object, true, true)
+            detectorProps[id] = object
+            SetModelAsNoLongerNeeded(model)
         end)
     end
-end)
 
-RegisterNetEvent('rs_outfitbag:qb:openOutfitOptions', function(data)
-    if not data or not data.outfit then return end
-    local outfit = data.outfit
+    zones[id] = lib.zones.box({
+        coords = coords,
+        size = vec3((detector.radius + 0.0) * 2.0, Config.BoxZoneDepth, Config.BoxZoneHeight),
+        rotation = detector.heading + 0.0,
+        debug = Config.Debug,
+        onEnter = function()
+            TriggerServerEvent('rs_metal_scanner:server:enteredDetector', id)
+        end
+    })
+end
 
-    local Menu = {
-        {
-            header = outfit.name,
-            isMenuHeader = true
-        },
-        {
-            header = Language.dressup,
-            icon = "fas fa-tshirt",
-            params = {
-                event = "rs_outfitbag:qb:wearOutfit",
-                args = { outfit = outfit }
-            }
-        },
-        {
-            header = Language.rename,
-            icon = "fas fa-pen",
-            params = {
-                event = "rs_outfitbag:qb:renameOutfitMenu",
-                args = { outfit = outfit }
-            }
-        },
-        {
-            header = Language.delete,
-            icon = "fas fa-trash",
-            params = {
-                event = "rs_outfitbag:qb:deleteOutfit",
-                args = { outfit = outfit }
-            }
-        },
-        {
-            header = "⬅ " .. (Language.back or "Zpět"),
-            params = {
-                event = "rs_outfitbag:showOutfitList"
-            }
-        }
+local function rebuildDetectors(list)
+    for id in pairs(zones) do removeDetector(id) end
+    for id in pairs(detectorProps) do removeDetector(id) end
+    detectors = {}
+
+    for i = 1, #list do
+        local detector = list[i]
+        local id = tonumber(detector.id)
+        if id then
+            detector.id = id
+            detectors[id] = detector
+            createDetector(detector)
+        end
+    end
+end
+
+local function cleanupHandScanner()
+    local ped = cache.ped
+    if Config.HandScannerAnimation and Config.HandScannerAnimation.dict then
+        StopAnimTask(ped, Config.HandScannerAnimation.dict, Config.HandScannerAnimation.clip, 1.0)
+    end
+    deleteEntitySafe(scannerProp)
+    scannerProp = nil
+    scannerBusy = false
+end
+
+local function itemList(items)
+    local values = {}
+    for i = 1, #(items or {}) do
+        values[#values + 1] = ('%s x%s'):format(items[i].name, items[i].count)
+    end
+    return table.concat(values, ', ')
+end
+
+local function scanPlayer(entity)
+    if scannerBusy or not entity or not DoesEntityExist(entity) then return end
+
+    local isNpc = false
+    local playerIndex = NetworkGetPlayerIndexFromPed(entity)
+    local target
+    if playerIndex == -1 then
+        if Config.Debug then
+            isNpc = true
+        else
+            return
+        end
+    else
+        target = GetPlayerServerId(playerIndex)
+    end
+
+    local hasScanner = 0
+    if GetResourceState('nord_inventory') == 'started' or Config.Inventory == 'nord_inventory' or Config.Inventory == 'nord' then
+        hasScanner = exports.nord_inventory:GetItemCount(Config.HandScannerItem) or exports.nord_inventory:Search('count', Config.HandScannerItem) or 0
+    else
+        hasScanner = exports[Config.Inventory]:Search('count', Config.HandScannerItem) or 0
+    end
+    if (tonumber(hasScanner) or 0) < 1 then
+        notify('no_scanner', 'error')
+        return
+    end
+
+    if #(GetEntityCoords(cache.ped) - GetEntityCoords(entity)) > Config.ScanDistance + 0.1 then
+        notify('scan_too_far', 'error')
+        return
+    end
+
+    scannerBusy = true
+    notify('scan_start', 'inform')
+
+    local model = loadModel(Config.HandScannerProp)
+    if not model then
+        if Config.Debug then
+            print(("[DEBUG] Primary hand scanner prop '%s' failed to load. Trying fallback prop '%s'."):format(Config.HandScannerProp, Config.HandScannerFallbackProp))
+        end
+        model = loadModel(Config.HandScannerFallbackProp)
+    end
+
+    local animation = Config.HandScannerAnimation
+    local animLoaded = loadAnimDict(animation.dict)
+
+    if not model or not animLoaded then
+        if Config.Debug then
+            print(("[DEBUG] Scan player failed setup. Model Loaded: %s, Anim Dict Loaded: %s"):format(tostring(model ~= nil), tostring(animLoaded)))
+        end
+        cleanupHandScanner()
+        notify('server_error', 'error')
+        return
+    end
+
+    local ped = cache.ped
+    local attachment = Config.HandScannerAttachment
+    local coords = GetEntityCoords(ped)
+    scannerProp = CreateObjectNoOffset(model, coords.x, coords.y, coords.z, true, true, false)
+    AttachEntityToEntity(
+        scannerProp, ped, GetPedBoneIndex(ped, attachment.bone),
+        attachment.position.x, attachment.position.y, attachment.position.z,
+        attachment.rotation.x, attachment.rotation.y, attachment.rotation.z,
+        true, true, false, true, 1, true
+    )
+    SetModelAsNoLongerNeeded(model)
+
+    if isNpc then
+        local anim = Config.TargetScannerAnimation
+        if anim and anim.enabled then
+            loadAnimDict(anim.dict)
+            TaskPlayAnim(entity, anim.dict, anim.clip, 8.0, -8.0, -1, anim.flag, 0, false, false, false)
+        end
+    else
+        TriggerServerEvent('rs_metal_scanner:server:syncTargetAnimation', target, true)
+    end
+
+    local completed = lib.progressBar({
+        duration = Config.ScanDuration,
+        label = T('scan_start'),
+        useWhileDead = false,
+        canCancel = true,
+        disable = { move = true, car = true, combat = true, sprint = true },
+        anim = { dict = animation.dict, clip = animation.clip, flag = animation.flag }
+    })
+
+    local stillClose = DoesEntityExist(entity)
+        and #(GetEntityCoords(cache.ped) - GetEntityCoords(entity)) <= Config.ScanDistance + 0.35
+    cleanupHandScanner()
+
+    if isNpc then
+        local anim = Config.TargetScannerAnimation
+        if anim and anim.enabled then
+            StopAnimTask(entity, anim.dict, anim.clip, 1.0)
+        end
+    else
+        TriggerServerEvent('rs_metal_scanner:server:syncTargetAnimation', target, false)
+    end
+
+    if not completed then
+        notify('scan_cancelled', 'error')
+        return
+    end
+    if not stillClose then
+        notify('scan_too_far', 'error')
+        return
+    end
+
+    if isNpc then
+        notify('scan_clear', 'success')
+        if Config.Debug then
+            print("[DEBUG] NPC scanned successfully (simulated clear result).")
+        end
+        return
+    end
+
+    local result = lib.callback.await('rs_metal_scanner:server:scanPlayer', false, target)
+    if not result or not result.ok then
+        notify(result and result.error or 'server_error', 'error')
+        return
+    end
+
+    if result.detected then
+        notify('scan_detected', 'error')
+        if Config.HandScannerBeep then
+            local plyCoords = GetEntityCoords(cache.ped)
+            local soundId = GetSoundId()
+            PlaySoundFromCoord(soundId, Config.BeepSound.name, plyCoords.x, plyCoords.y, plyCoords.z, Config.BeepSound.set, false, 0, false)
+            SetVariableOnSound(soundId, 'Volume', Config.BeepSound.volume)
+            CreateThread(function()
+                Wait(1000)
+                StopSound(soundId)
+                ReleaseSoundId(soundId)
+            end)
+        end
+        if Config.ShowDetectedItems and result.items and #result.items > 0 then
+            lib.notify({ title = T('creator_title'), description = T('found_items', itemList(result.items)), type = 'warning' })
+        end
+    else
+        notify('scan_clear', 'success')
+    end
+end
+
+local function splitCsv(value)
+    local result, seen = {}, {}
+    for entry in tostring(value or ''):gmatch('[^,]+') do
+        entry = entry:lower():gsub('^%s*(.-)%s*$', '%1')
+        if entry ~= '' and not seen[entry] then
+            seen[entry] = true
+            result[#result + 1] = entry
+        end
+    end
+    return result
+end
+
+local function joinList(value)
+    return type(value) == 'table' and table.concat(value, ', ') or ''
+end
+
+local function detectorForm(kind, existing)
+    local currentCoords = GetEntityCoords(cache.ped)
+    local values = existing or {
+        name = '',
+        coords = { x = currentCoords.x, y = currentCoords.y, z = currentCoords.z },
+        heading = GetEntityHeading(cache.ped),
+        radius = Config.DefaultRadius,
+        cooldown = Config.DefaultCooldown,
+        job_restriction = {},
+        notify_jobs = {},
+        ignored_jobs = {},
+        trigger_dispatch = true,
+        spawn_model = kind == 'model',
+        active = true,
+        persistent = true
     }
-    exports['qb-menu']:openMenu(Menu)
-end)
 
-RegisterNetEvent('rs_outfitbag:qb:wearOutfit', function(data)
-    local outfit = data.outfit
-    local ped = PlayerPedId()
-    local dict = "missmic4"
-    local clip = "michael_tux_fidget"
+    local rows = {
+        { type = 'input', label = T('form_name'), required = true, default = values.name, min = 1, max = 100 },
+        { type = 'number', label = T('form_coord_x'), required = true, default = values.coords.x, precision = 3 },
+        { type = 'number', label = T('form_coord_y'), required = true, default = values.coords.y, precision = 3 },
+        { type = 'number', label = T('form_coord_z'), required = true, default = values.coords.z, precision = 3 },
+        { type = 'number', label = T('form_heading'), required = true, default = values.heading, min = 0, max = 360, precision = 1 },
+        { type = 'number', label = T('form_radius'), required = true, default = values.radius, min = 0.1, max = Config.MaximumRadius, precision = 2 },
+        { type = 'number', label = T('form_cooldown'), required = true, default = values.cooldown, min = Config.MinimumCooldown, precision = 0 },
+        { type = 'input', label = T('form_job_restriction'), default = joinList(values.job_restriction) },
+        { type = 'input', label = T('form_notify_jobs'), default = joinList(values.notify_jobs) },
+        { type = 'input', label = T('form_ignored_jobs'), default = joinList(values.ignored_jobs) },
+        { type = 'checkbox', label = T('trigger_dispatch_label'), description = T('trigger_dispatch_desc'), checked = values.trigger_dispatch ~= false }
+    }
 
-    RequestAnimDict(dict)
-    while not HasAnimDictLoaded(dict) do Wait(10) end
-    TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
+    if kind == 'model' then
+        rows[#rows + 1] = { type = 'checkbox', label = T('form_spawn_model'), checked = values.spawn_model ~= false }
+    end
+    if not existing then
+        rows[#rows + 1] = { type = 'checkbox', label = T('form_save_db'), checked = true }
+    end
+    rows[#rows + 1] = { type = 'checkbox', label = T('form_active'), checked = values.active ~= false }
 
-    Wait(1500)
-    TriggerServerEvent("rs_outfitbag:wearOutfit", outfit.id)
-end)
+    local input = lib.inputDialog(existing and T('edit') or (kind == 'model' and T('create_model') or T('create_zone')), rows)
+    if not input then return nil end
 
-RegisterNetEvent('rs_outfitbag:qb:renameOutfitMenu', function(data)
-    local outfit = data.outfit
-    local dialog = exports['qb-input']:ShowInput({
-        header = Language.renameoutfit,
-        submitText = Language.save,
-        inputs = {
+    local triggerDispatch = input[11] == true
+    local index = 11
+
+    local spawnModel = false
+    if kind == 'model' then
+        index = index + 1
+        spawnModel = input[index] == true
+    end
+    local persistent = existing and existing.persistent ~= false or true
+    if not existing then
+        index = index + 1
+        persistent = input[index] == true
+    end
+    index = index + 1
+
+    return {
+        name = input[1],
+        type = kind,
+        coords = { x = tonumber(input[2]), y = tonumber(input[3]), z = tonumber(input[4]) },
+        heading = tonumber(input[5]),
+        radius = tonumber(input[6]),
+        cooldown = tonumber(input[7]),
+        job_restriction = splitCsv(input[8]),
+        notify_jobs = splitCsv(input[9]),
+        ignored_jobs = splitCsv(input[10]),
+        trigger_dispatch = triggerDispatch,
+        spawn_model = spawnModel,
+        persistent = persistent,
+        active = input[index] == true
+    }
+end
+
+local openMainMenu, openManagement, openDetectorMenu
+
+local function createNewDetector(kind)
+    local input = detectorForm(kind)
+    if not input then return end
+    local result = lib.callback.await('rs_metal_scanner:server:createDetector', false, input)
+    if result and result.ok then
+        notify('detector_created', 'success')
+    else
+        notify(result and result.error or 'server_error', 'error')
+    end
+    openMainMenu()
+end
+
+openDetectorMenu = function(detector)
+    lib.registerContext({
+        id = 'rs_metal_scanner_detector_actions',
+        title = ('%s (#%s)'):format(detector.name, detector.id),
+        menu = 'rs_metal_scanner_management',
+        options = {
             {
-                type = 'text',
-                isRequired = true,
-                name = 'name',
-                text = Language.renameoutfitname,
-                default = outfit.name
+                title = T('teleport'), icon = 'location-dot',
+                onSelect = function()
+                    SetEntityCoords(cache.ped, detector.coords.x, detector.coords.y, detector.coords.z + 0.5, false, false, false, false)
+                end
+            },
+            {
+                title = T('edit'), icon = 'pen-to-square',
+                onSelect = function()
+                    local input = detectorForm(detector.type, detector)
+                    if not input then return end
+                    local result = lib.callback.await('rs_metal_scanner:server:updateDetector', false, detector.id, input)
+                    notify(result and result.ok and 'detector_updated' or (result and result.error or 'server_error'), result and result.ok and 'success' or 'error')
+                    openManagement()
+                end
+            },
+            {
+                title = T('toggle'),
+                description = detector.active and T('detector_disabled') or T('detector_enabled'),
+                icon = detector.active and 'toggle-on' or 'toggle-off',
+                onSelect = function()
+                    local result = lib.callback.await('rs_metal_scanner:server:toggleDetector', false, detector.id)
+                    if result and result.ok then
+                        notify(result.active and 'detector_enabled' or 'detector_disabled', 'success')
+                    else
+                        notify(result and result.error or 'server_error', 'error')
+                    end
+                    openManagement()
+                end
+            },
+            {
+                title = T('delete'), icon = 'trash', iconColor = '#ef4444',
+                onSelect = function()
+                    local answer = lib.alertDialog({
+                        header = T('delete'), content = T('confirm_delete', detector.name), centered = true, cancel = true
+                    })
+                    if answer ~= 'confirm' then return end
+                    local result = lib.callback.await('rs_metal_scanner:server:deleteDetector', false, detector.id)
+                    notify(result and result.ok and 'detector_deleted' or (result and result.error or 'server_error'), result and result.ok and 'success' or 'error')
+                    openManagement()
+                end
             }
         }
     })
-
-    if dialog and dialog.name then
-        TriggerServerEvent("rs_outfitbag:renameOutfit", outfit.id, dialog.name)
-        Notify(Language.title, "Outfit přejmenován", 'success')
-        TriggerEvent('rs_outfitbag:showOutfitList')
-    end
-end)
-
-RegisterNetEvent('rs_outfitbag:qb:deleteOutfit', function(data)
-    TriggerServerEvent("rs_outfitbag:deleteOutfit", data.outfit.id)
-    Notify(Language.title, "Outfit smazán", 'success')
-    TriggerEvent('rs_outfitbag:showOutfitList')
-end)
-
-
-if Config.Command.enabled then
-    RegisterCommand(Config.Command.command, function()
-        DebugPrint('Bag has been opened')
-        TriggerEvent('rs_outfitbag:place')
-    end)
+    lib.showContext('rs_metal_scanner_detector_actions')
 end
 
-exports('place', function()
- TriggerEvent('rs_outfitbag:place')
-end)
-
-RegisterNetEvent('rs_outfitbag:placed')
-AddEventHandler('rs_outfitbag:placed',function ()
-    DebugPrint('Bag has been placed')
-    TriggerServerEvent('rs_outfitbag:placedBag')
-end)
-
-RegisterNetEvent('rs_outfitbag:pickedup')
-AddEventHandler('rs_outfitbag:pickedup', function()
-    DebugPrint('Progress bar for picking up bag has started')
-        local ped = PlayerPedId()
-        local dict = "random@domestic"
-        local clip = "pickup_low"
-        local model = Config.Prop 
-
-        RequestAnimDict(dict)
-        while not HasAnimDictLoaded(dict) do Wait(10) end
-        RequestModel(model)        
-        while not HasModelLoaded(model) do Wait(10) end
-
-        local boneIndex = GetPedBoneIndex(ped, 57005)
-        local x, y, z = table.unpack(GetEntityCoords(ped))
-        local prop = CreateObject(GetHashKey(model), x, y, z + 0.2, true, true, false)
-        SetEntityCollision(prop, false, false)
-        SetEntityVisible(prop, true, false)
-        AttachEntityToEntity(prop, ped, boneIndex, 0.12, 0.02, 0.02, 80.0, 180.0, 170.0, true, true, false, true, 1, true)        
-    
-        TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
-        Wait(1500)
-
-        DeleteObject(prop)
-        ClearPedTasks(ped)
-
-    DebugPrint('Progress bar completed')
-    TriggerServerEvent('rs_outfitbag:pickedupBag')
-    DebugPrint('Bag has been added to inventory')
-
-    local playerCoords = GetEntityCoords(PlayerPedId())
-    local modelHash = GetHashKey(Config.Prop)
-    local closestBag = GetClosestObjectOfType(playerCoords, 2.0, modelHash, false, false, false)
-
-    if closestBag and DoesEntityExist(closestBag) then
-        DebugPrint('Found outfitbag prop. Deleting...')
-        NetworkRequestControlOfEntity(closestBag)
-        Wait(100)
-
-        if NetworkHasControlOfEntity(closestBag) then
-            DeleteEntity(closestBag)
-            DebugPrint('Outfitbag entity deleted')
-        else
-            DebugPrint('Failed to gain control of outfitbag entity')
-        end
-    else
-        DebugPrint('No valid outfitbag entity found near player')
-    end
-end)
-
-RegisterNetEvent('rs_outfitbag:place')
-AddEventHandler('rs_outfitbag:place',function ()
-    while Config.Inventory == 'auto' do
-        DebugPrint('Waiting for inventory auto-detection...')
-        Citizen.Wait(100)
-    end
-
-    RequestModel(Config.Prop)
-    while not HasModelLoaded(Config.Prop) do Citizen.Wait(10) DebugPrint('Loading bag model...') end
-    local ped = PlayerPedId()
-
-    local count
-    if Config.Inventory == 'ox' then
-     count = lib.callback.await('ox_inventory:getItemCount', false, Config.Item.item, {})
-     if count == nil then
-            if Config.Notify == 'esx' then Notify(Language.noitem) else Notify(Language.title, Language.noitem, 'error') end
-        return
-     end
-    elseif Config.Inventory == 'qs' then
-     count = exports['qs-inventory']:Search(Config.Item.item)
-          if count == nil then
-            if Config.Notify == 'esx' then Notify(Language.noitem) else Notify(Language.title, Language.noitem, 'error') end
-        return
-     end
-    elseif Config.Inventory == 'codem' then
-    count = lib.callback.await('codem_inventory:getItemCount', false, Config.Item.item, {})
-    if count == nil then
-        if Config.Notify == 'esx' then Notify(Language.noitem) else Notify(Language.title, Language.noitem, 'error') end
+openManagement = function()
+    local result = lib.callback.await('rs_metal_scanner:server:getDetectors', false)
+    if not result or not result.ok then
+        notify(result and result.error or 'server_error', 'error')
         return
     end
-    elseif Config.Inventory == 'qb' then
-        local playerData = QBCore.Functions.GetPlayerData()
-        count = 0
-        if playerData and playerData.items then
-            for _, item in pairs(playerData.items) do
-                if item and item.name == Config.Item.item then
-                    count = item.amount
-                    break
+
+    local options = {}
+    for i = 1, #result.detectors do
+        local detector = result.detectors[i]
+        options[#options + 1] = {
+            title = detector.name,
+            description = ('#%s · %s · %.1fm · %s · Dispatch: %s'):format(
+                detector.id, detector.type == 'model' and 'model' or 'zone', detector.radius, detector.active and 'ON' or 'OFF', detector.trigger_dispatch and T('dispatch_yes') or T('dispatch_no')
+            ),
+            icon = detector.type == 'model' and 'person-through-window' or 'circle-dot',
+            iconColor = detector.active and '#22c55e' or '#ef4444',
+            arrow = true,
+            onSelect = function() openDetectorMenu(detector) end
+        }
+    end
+    if #options == 0 then options[1] = { title = T('no_detectors'), disabled = true } end
+
+    lib.registerContext({
+        id = 'rs_metal_scanner_management',
+        title = T('manage'),
+        menu = 'rs_metal_scanner_main',
+        options = options
+    })
+    lib.showContext('rs_metal_scanner_management')
+end
+
+openMainMenu = function()
+    lib.registerContext({
+        id = 'rs_metal_scanner_main',
+        title = T('creator_title'),
+        options = {
+            { title = T('create_model'), icon = 'archway', onSelect = function() createNewDetector('model') end },
+            { title = T('create_zone'), icon = 'circle-dot', onSelect = function() createNewDetector('zone') end },
+            { title = T('manage'), icon = 'list-check', arrow = true, onSelect = openManagement },
+            {
+                title = T('refresh'), icon = 'rotate',
+                onSelect = function()
+                    local result = lib.callback.await('rs_metal_scanner:server:refreshDetectors', false)
+                    notify(result and result.ok and 'detectors_refreshed' or (result and result.error or 'server_error'), result and result.ok and 'success' or 'error')
+                    openMainMenu()
                 end
-            end
-        end
-        if not count or count <= 0 then
-            if Config.Notify == 'esx' then Notify(Language.noitem) else Notify(Language.title, Language.noitem, 'error') end
-            return
-        end
-    elseif Config.Inventory == 'custom' then
-        DebugPrint('Custom inventory selected but not implemented. Please add your custom inventory logic.')
-    else
-        DebugPrint('Invalid inventory type set in Config.Inventory')
-        return
-    end
+            }
+        }
+    })
+    lib.showContext('rs_metal_scanner_main')
+end
 
-    local x, y, z = table.unpack(GetEntityCoords(ped))
-    if count >= 1 then
-        DebugPrint('Player has '..count..' outfit bags')
+RegisterNetEvent('rs_metal_scanner:client:syncDetectors', rebuildDetectors)
 
-        local ped = PlayerPedId()
-        local dict = "random@domestic"
-        local clip = "pickup_low"
-        local model = Config.Prop 
+RegisterNetEvent('rs_metal_scanner:client:notify', function(key, notifyType)
+    notify(key, notifyType)
+end)
 
-        RequestAnimDict(dict)
-        while not HasAnimDictLoaded(dict) do Wait(10) end
-        RequestModel(model)        
-        while not HasModelLoaded(model) do Wait(10) end
+RegisterNetEvent('rs_metal_scanner:client:openCreator', openMainMenu)
 
-        local boneIndex = GetPedBoneIndex(ped, 57005) 
-        local x, y, z = table.unpack(GetEntityCoords(ped))
-        local prop = CreateObject(GetHashKey(model), x, y, z + 0.2, true, true, false)
-        SetEntityCollision(prop, false, false)
-        SetEntityVisible(prop, true, false)
-        AttachEntityToEntity(prop, ped, boneIndex, 0.12, 0.02, 0.02, 80.0, 180.0, 170.0, true, true, false, true, 1, true)        
-       
-        TaskPlayAnim(ped, dict, clip, 8.0, -8.0, 1500, 48, 0, false, false, false)
-        Wait(1500)
-
-        DeleteObject(prop)
-        ClearPedTasks(ped)
-
-        TriggerEvent('rs_outfitbag:placed')
-        local outfitbag = CreateObject(Config.Prop, x, y, z-1, true, false, false)
-        SetEntityHeading(outfitbag, GetEntityHeading(ped))
-        PlaceObjectOnGroundProperly(outfitbag)
-        table.insert(outfitbags, outfitbag)
-        if Config.Notify == 'esx' then
-           Notify(Language.placeditem)
-        else
-           Notify(Language.title, Language.placeditem, 'success')
-        end
-    else
-        DebugPrint('Player doesn\'t have the required item: '.. Config.Item.item)
+RegisterNetEvent('rs_metal_scanner:client:triggerDispatch', function(detector, found)
+    if SendClientDispatch then
+        SendClientDispatch(detector, found)
     end
 end)
 
-function stopScript()
-    DebugPrint('Ukončuji všechny události a entitky.')
-    for _, bag in ipairs(outfitbags) do
-        if DoesEntityExist(bag) then
-            DeleteEntity(bag)
-            DebugPrint('Bag entity has been deleted.')
+RegisterNetEvent('rs_metal_scanner:client:detectionAlert', function(playerName, items)
+    lib.notify({ title = T('creator_title'), description = T('detector_alert', playerName), type = 'warning' })
+    if items and #items > 0 then
+        lib.notify({ title = T('creator_title'), description = T('found_items', itemList(items)), type = 'warning' })
+    end
+end)
+
+RegisterNetEvent('rs_metal_scanner:client:detectorAlarm', function(detector, triggeringSource)
+    local coords = vec3(detector.coords.x, detector.coords.y, detector.coords.z)
+    if #(GetEntityCoords(cache.ped) - coords) <= Config.BeepSound.distance then
+        if Config.BeepSound.enabled then
+            local soundId = GetSoundId()
+            PlaySoundFromCoord(soundId, Config.BeepSound.name, coords.x, coords.y, coords.z, Config.BeepSound.set, false, 0, false)
+            SetVariableOnSound(soundId, 'Volume', Config.BeepSound.volume)
+            CreateThread(function()
+                Wait(1500)
+                StopSound(soundId)
+                ReleaseSoundId(soundId)
+            end)
         end
     end
-    outfitbags = {}  
-    DebugPrint('All events have been unregistered.')
 
-    Citizen.CreateThread(function()
-        DebugPrint('Stopping client script...')
-        SetTimeout(1000, function()  
-            ForceSocialClubUpdate()  
-            DebugPrint('Client script has been stopped.')
+    if triggeringSource == GetPlayerServerId(PlayerId()) then
+        notify('detector_beep', 'error')
+    end
+
+    local prop = detectorProps[tonumber(detector.id)]
+    if Config.DetectorFlash and Config.DetectorFlash.enabled then
+        CreateThread(function()
+            local flashes = Config.DetectorFlash.flashes or 4
+            local interval = Config.DetectorFlash.interval or 150
+            local enableRedLight = Config.DetectorFlash.enableRedLight ~= false
+
+            for _ = 1, flashes do
+                if prop and DoesEntityExist(prop) then
+                    SetEntityAlpha(prop, 100, false)
+                end
+
+                local timer = GetGameTimer() + interval
+                while GetGameTimer() < timer do
+                    if enableRedLight then
+                        DrawLightWithRange(coords.x, coords.y, coords.z + 1.0, 255, 0, 0, 3.5, 5.0)
+                    end
+                    Wait(0)
+                end
+
+                if prop and DoesEntityExist(prop) then
+                    SetEntityAlpha(prop, 255, false)
+                end
+                Wait(interval)
+            end
+
+            if prop and DoesEntityExist(prop) then
+                ResetEntityAlpha(prop)
+            end
         end)
-    end)
-    DebugPrint('Script has been stopped.')
-end
+    end
 
-AddEventHandler('onResourceStart', function(resourceName)
-    local resourceName = 'rs_outfitbagv2'
+    if OnClientDetectorAlarm then
+        OnClientDetectorAlarm(detector, triggeringSource)
+    end
+end)
 
-    if resourceName == GetCurrentResourceName() then
-        for k, bag in pairs(outfitbags) do
-            DebugPrint('Trying to deleted outfitbag with hash key: '..bag)
-            if DoesEntityExist(bag) then DeleteEntity(bag) DebugPrint('Deleted '..bag) end
+CreateThread(function()
+    exports[Config.Target]:addGlobalPlayer({
+        {
+            name = 'rs_metal_scanner_scan_player',
+            icon = 'fa-solid fa-magnifying-glass',
+            label = T('target_scan'),
+            items = Config.HandScannerItem,
+            distance = Config.ScanDistance,
+            canInteract = function(entity, distance)
+                return not scannerBusy and entity ~= cache.ped and distance <= Config.ScanDistance
+            end,
+            onSelect = function(data) scanPlayer(data.entity) end
+        }
+    })
+
+    if Config.Debug then
+        exports[Config.Target]:addGlobalPed({
+            {
+                name = 'rs_metal_scanner_scan_ped_debug',
+                icon = 'fa-solid fa-magnifying-glass',
+                label = T('target_scan') .. " (NPC Debug)",
+                items = Config.HandScannerItem,
+                distance = Config.ScanDistance,
+                canInteract = function(entity, distance)
+                    if NetworkGetPlayerIndexFromPed(entity) ~= -1 then return false end
+                    return not scannerBusy and entity ~= cache.ped and distance <= Config.ScanDistance
+                end,
+                onSelect = function(data) scanPlayer(data.entity) end
+            }
+        })
+    end
+
+    Wait(500)
+    TriggerServerEvent('rs_metal_scanner:server:requestSync')
+end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    cleanupHandScanner()
+    for id in pairs(zones) do removeDetector(id) end
+    for id in pairs(detectorProps) do removeDetector(id) end
+    exports[Config.Target]:removeGlobalPlayer('rs_metal_scanner_scan_player')
+    if Config.Debug then
+        exports[Config.Target]:removeGlobalPed('rs_metal_scanner_scan_ped_debug')
+    end
+end)
+
+local targetPlayingAnim = false
+RegisterNetEvent('rs_metal_scanner:client:playTargetAnimation', function(play)
+    local ped = cache.ped
+    if play then
+        local anim = Config.TargetScannerAnimation
+        if anim and anim.enabled then
+            loadAnimDict(anim.dict)
+            TaskPlayAnim(ped, anim.dict, anim.clip, 8.0, -8.0, -1, anim.flag, 0, false, false, false)
+            targetPlayingAnim = true
         end
-    elseif resourceName ~= GetCurrentResourceName() then
-        stopScript()
+    else
+        if targetPlayingAnim then
+            local anim = Config.TargetScannerAnimation
+            StopAnimTask(ped, anim.dict, anim.clip, 1.0)
+            targetPlayingAnim = false
+        end
     end
 end)
